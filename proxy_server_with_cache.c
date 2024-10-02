@@ -16,95 +16,130 @@
 #include <semaphore.h>
 #include <time.h>
 
-#define MAX_CLIENTS 10 
+#define MAX_CLIENTS 10
 
-typedef struct cache_element cache_element ; 
+typedef struct cache_element cache_element;
 
-
-// LRU policy -> using timestamp of cache element 
-struct cache_element{
-    char * data ;
-    int len ; 
-    char * url ; 
-    time_t lru_time_track ; 
-    cache_element * next ; 
+// LRU policy -> using timestamp of cache element
+struct cache_element
+{
+    char *data;
+    int len;
+    char *url;
+    time_t lru_time_track;
+    cache_element *next;
 };
 
-cache_element * find(char * url) ; 
+cache_element *find(char *url);
 
-int add_cache_element(char * data , int size , char * url) ;
+int add_cache_element(char *data, int size, char *url);
 
-void remove_cache_element() ;
+void remove_cache_element();
 
-int port_number = 8080 ; 
+int port_number = 8080;
 
-int proxy_socket_id ; 
+int proxy_socket_id;
 
-pthread_t tid[MAX_CLIENTS]  ;
+pthread_t tid[MAX_CLIENTS];
 
+// for every thread with
+sem_t semaphore;
 
-// for every thread with 
-sem_t semaphore ; 
+pthread_mutex_t lock;
 
-pthread_mutex_t lock ; 
+cache_element *head;
+int cache_size;
 
-cache_element * head ; 
-int cache_size ; 
+int main(int argc, char *argv[])
+{
+    int client_socket_id;
+    int client_len;
+    struct sockaddr_in server_addr, client_addr;
+    sem_init(&semaphore, 0, MAX_CLIENTS);
+    pthread_mutex_init(&lock, NULL);
 
-int main(int argc , char * argv[]){
-    int client_socket_id ;
-    int client_len ; 
-    struct sockaddr_in server_addr , client_addr;
-    sem_init(&semaphore , 0 , MAX_CLIENTS) ;
-    pthread_mutex_init(&lock , NULL) ; 
-
-    if(argv == 2){
-        // ./proxy 3000 
-        // extract the port number from input 
-        port_number = atoi(argv[1]); 
+    if (argv == 2)
+    {
+        // ./proxy 3000
+        // extract the port number from input
+        port_number = atoi(argv[1]);
     }
-    else{
-        printf("Too few arguments\n") ; 
-        exit(1) ; 
+    else
+    {
+        printf("Too few arguments\n");
+        exit(1);
     }
 
-    printf("Starting proxy server at port : %d\n" , port_number) ; 
-    proxy_socket_id = socket(AF_INET , SOCK_STREAM , 0) ; 
+    printf("Starting proxy server at port : %d\n", port_number);
+    proxy_socket_id = socket(AF_INET, SOCK_STREAM, 0);
 
-    if(proxy_socket_id < 0){
-        perror("Failed to create socket for proxy server\n") ;
-        exit(1) ; 
+    if (proxy_socket_id < 0)
+    {
+        perror("Failed to create socket for proxy server\n");
+        exit(1);
     }
     // Allows multiple sockets to bind to the same port. (make it reusable)
-    int reuse = 1; 
-    if(setsockopt(proxy_socket_id , SOL_SOCKET , SO_REUSEADDR , (const char *)&reuse , sizeof(reuse)) < 0){
-        perror("SetSockOpt failed\n")  ;
-        exit(1) ; 
+    int reuse = 1;
+    if (setsockopt(proxy_socket_id, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse)) < 0)
+    {
+        perror("SetSockOpt failed\n");
+        exit(1);
     }
 
-    bzero((char*)&server_addr , sizeof(server_addr)) ; 
+    bzero((char *)&server_addr, sizeof(server_addr));
     // bzero set a block of memory to zero
     // can be replaced with memset((char*)&server_addr , 0 , sizeof(server_addr))
 
     server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(port_number); // Assigning port to the Proxy
-	server_addr.sin_addr.s_addr = INADDR_ANY; // Any available adress assigned
+    server_addr.sin_port = htons(port_number); // Assigning port to the Proxy
+    server_addr.sin_addr.s_addr = INADDR_ANY;  // Any available adress assigned
 
-       // Binding the socket
-	if( bind(proxy_socketId, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0 )
-	{
-		perror("Port is not free\n");
-		exit(1);
-	}
-	printf("Binding on port: %d\n",port_number);
+    // Binding the socket
+    if (bind(proxy_socketId, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        perror("Port is not free\n");
+        exit(1);
+    }
+    printf("Binding on port: %d\n", port_number);
 
-     // Proxy socket listening to the requests
-	int listen_status = listen(proxy_socketId, MAX_CLIENTS);
+    // Proxy socket listening to the requests
+    int listen_status = listen(proxy_socketId, MAX_CLIENTS);
 
-	if(listen_status < 0 )
-	{
-		perror("Error while Listening !\n");
-		exit(1);
-	}
-    return 0 ; 
+    if (listen_status < 0)
+    {
+        perror("Error while Listening !\n");
+        exit(1);
+    }
+
+    // Infinite Loop for accepting connections
+    while (1)
+    {
+
+        bzero((char *)&client_addr, sizeof(client_addr)); // Clears struct client_addr
+        client_len = sizeof(client_addr);
+
+        // Accepting the connections
+        client_socketId = accept(proxy_socketId, (struct sockaddr *)&client_addr, (socklen_t *)&client_len); // Accepts connection
+        if (client_socketId < 0)
+        {
+            fprintf(stderr, "Error in Accepting connection !\n");
+            exit(1);
+        }
+        else
+        {
+            Connected_socketId[i] = client_socketId; // Storing accepted client into array
+        }
+
+        // Getting IP address and port number of client
+        struct sockaddr_in *client_pt = (struct sockaddr_in *)&client_addr;
+        struct in_addr ip_addr = client_pt->sin_addr;
+        char str[INET_ADDRSTRLEN]; // INET_ADDRSTRLEN: Default ip address size
+        inet_ntop(AF_INET, &ip_addr, str, INET_ADDRSTRLEN);
+        printf("Client is connected with port number: %d and ip address: %s \n", ntohs(client_addr.sin_port), str);
+        // printf("Socket values of index %d in main function is %d\n",i, client_socketId);
+        pthread_create(&tid[i], NULL, thread_fn, (void *)&Connected_socketId[i]); // Creating a thread for each client accepted
+        i++;
+    }
+    close(proxy_socketId);
+    return 0;
 }
