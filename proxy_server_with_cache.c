@@ -54,7 +54,7 @@ int cache_size ;
 int main(int argc , char * argv[]){
     int client_socket_id ;
     int client_len ; 
-    struct sockaddr server_addr , client_addr;
+    struct sockaddr_in server_addr , client_addr;
     sem_init(&semaphore , 0 , MAX_CLIENTS) ;
     pthread_mutex_init(&lock , NULL) ; 
 
@@ -75,11 +75,36 @@ int main(int argc , char * argv[]){
         perror("Failed to create socket for proxy server\n") ;
         exit(1) ; 
     }
-    // Allows multiple sockets to bind to the same port.
+    // Allows multiple sockets to bind to the same port. (make it reusable)
     int reuse = 1; 
-    if(setsockopt(proxy_socket_id , SOL_SOCKET , SO_REUSEADDR , (const char *)&reuse , sizeof(reuse) < 0){
+    if(setsockopt(proxy_socket_id , SOL_SOCKET , SO_REUSEADDR , (const char *)&reuse , sizeof(reuse)) < 0){
         perror("SetSockOpt failed\n")  ;
         exit(1) ; 
     }
+
+    bzero((char*)&server_addr , sizeof(server_addr)) ; 
+    // bzero set a block of memory to zero
+    // can be replaced with memset((char*)&server_addr , 0 , sizeof(server_addr))
+
+    server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(port_number); // Assigning port to the Proxy
+	server_addr.sin_addr.s_addr = INADDR_ANY; // Any available adress assigned
+
+       // Binding the socket
+	if( bind(proxy_socketId, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0 )
+	{
+		perror("Port is not free\n");
+		exit(1);
+	}
+	printf("Binding on port: %d\n",port_number);
+
+     // Proxy socket listening to the requests
+	int listen_status = listen(proxy_socketId, MAX_CLIENTS);
+
+	if(listen_status < 0 )
+	{
+		perror("Error while Listening !\n");
+		exit(1);
+	}
     return 0 ; 
 }
