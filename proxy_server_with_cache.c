@@ -50,6 +50,10 @@ pthread_mutex_t lock;
 cache_element *head;
 int cache_size;
 
+
+void thread_fn(){
+
+}
 int main(int argc, char *argv[])
 {
     int client_socket_id;
@@ -95,7 +99,7 @@ int main(int argc, char *argv[])
     server_addr.sin_addr.s_addr = INADDR_ANY;  // Any available adress assigned
 
     // Binding the socket
-    if (bind(proxy_socketId, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (bind(proxy_socket_id, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("Port is not free\n");
         exit(1);
@@ -103,13 +107,17 @@ int main(int argc, char *argv[])
     printf("Binding on port: %d\n", port_number);
 
     // Proxy socket listening to the requests
-    int listen_status = listen(proxy_socketId, MAX_CLIENTS);
+    int listen_status = listen(proxy_socket_id, MAX_CLIENTS);
 
     if (listen_status < 0)
     {
         perror("Error while Listening !\n");
         exit(1);
     }
+
+
+	int i = 0; // Iterator for thread_id (tid) and Accepted Client_Socket for each thread
+	int Connected_socketId[MAX_CLIENTS];   // This array stores socket descriptors of connected clients
 
     // Infinite Loop for accepting connections
     while (1)
@@ -119,15 +127,15 @@ int main(int argc, char *argv[])
         client_len = sizeof(client_addr);
 
         // Accepting the connections
-        client_socketId = accept(proxy_socketId, (struct sockaddr *)&client_addr, (socklen_t *)&client_len); // Accepts connection
-        if (client_socketId < 0)
+        client_socket_id = accept(proxy_socket_id, (struct sockaddr *)&client_addr, (socklen_t *)&client_len); // Accepts connection
+        if (client_socket_id < 0)
         {
             fprintf(stderr, "Error in Accepting connection !\n");
             exit(1);
         }
         else
         {
-            Connected_socketId[i] = client_socketId; // Storing accepted client into array
+            Connected_socketId[i] = client_socket_id; // Storing accepted client into array
         }
 
         // Getting IP address and port number of client
@@ -140,6 +148,6 @@ int main(int argc, char *argv[])
         pthread_create(&tid[i], NULL, thread_fn, (void *)&Connected_socketId[i]); // Creating a thread for each client accepted
         i++;
     }
-    close(proxy_socketId);
+    close(proxy_socket_id);
     return 0;
 }
