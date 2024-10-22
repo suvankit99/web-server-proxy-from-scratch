@@ -52,7 +52,10 @@ int cache_size;
 
 
 void thread_fn(){
-
+    sem_wait(&semaphore); 
+	int p;
+	sem_getvalue(&semaphore,&p);
+	printf("semaphore value:%d\n",p);
 }
 int main(int argc, char *argv[])
 {
