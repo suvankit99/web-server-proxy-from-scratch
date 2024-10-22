@@ -18,6 +18,9 @@
 
 #define MAX_CLIENTS 10
 
+#define MAX_BYTES 4096    //max allowed size of request/response
+
+
 typedef struct cache_element cache_element;
 
 // LRU policy -> using timestamp of cache element
@@ -51,11 +54,36 @@ cache_element *head;
 int cache_size;
 
 
-void thread_fn(){
+void thread_fn(void * socketNew){
     sem_wait(&semaphore); 
 	int p;
 	sem_getvalue(&semaphore,&p);
 	printf("semaphore value:%d\n",p);
+
+    int* t= (int*)(socketNew);
+	int socket=*t;           // Socket is socket descriptor of the connected Client
+	int bytes_sent_from_client,len;	  // Bytes Transferred
+
+	
+	char *buffer = (char*)calloc(MAX_BYTES,sizeof(char));	// Creating buffer of 4kb for a client
+	
+	
+	bzero(buffer, MAX_BYTES);								// Making buffer zero
+	bytes_sent_from_client = recv(socket, buffer, MAX_BYTES, 0); // Receiving the Request of client by proxy server
+	
+	while(bytes_sent_from_client > 0)
+	{
+		len = strlen(buffer);
+        //loop until u find "\r\n\r\n" in the buffer , it is the EOF ( End of file ) for buffer
+        // Loop until you reach end of buffer 
+		if(strstr(buffer, "\r\n\r\n") == NULL)
+		{	
+			bytes_sent_from_client = recv(socket, buffer + len, MAX_BYTES - len, 0);
+		}
+		else{
+			break;
+		}
+	}
 }
 int main(int argc, char *argv[])
 {
