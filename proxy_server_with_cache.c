@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port_number); // Assigning port to the Proxy
-    server_addr.sin_addr.s_addr = INADDR_ANY;  // Any available adress assigned
+    server_addr.sin_addr.s_addr = INADDR_ANY;  // Any available address assigned
 
     // Binding the socket
     if (bind(proxy_socket_id, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
@@ -139,11 +139,16 @@ int main(int argc, char *argv[])
         }
 
         // Getting IP address and port number of client
-        struct sockaddr_in *client_pt = (struct sockaddr_in *)&client_addr;
-        struct in_addr ip_addr = client_pt->sin_addr;
+        struct sockaddr_in *client_pt = (struct sockaddr_in *)&client_addr; // creating a copy
+        struct in_addr ip_addr = client_pt->sin_addr; // extract ip address
+
         char str[INET_ADDRSTRLEN]; // INET_ADDRSTRLEN: Default ip address size
-        inet_ntop(AF_INET, &ip_addr, str, INET_ADDRSTRLEN);
+        inet_ntop(AF_INET, &ip_addr, str, INET_ADDRSTRLEN);// store the ip address in str char array 
+        // we are doing this just to print it 
+
         printf("Client is connected with port number: %d and ip address: %s \n", ntohs(client_addr.sin_port), str);
+
+
         // printf("Socket values of index %d in main function is %d\n",i, client_socketId);
         pthread_create(&tid[i], NULL, thread_fn, (void *)&Connected_socketId[i]); // Creating a thread for each client accepted
         i++;
