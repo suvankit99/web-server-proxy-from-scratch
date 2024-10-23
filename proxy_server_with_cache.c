@@ -151,6 +151,9 @@ void thread_fn(void * socketNew){
 					sendErrorMessage(socket, 500);			// 500 Internal Error
 
 			}
+            else{
+                printf("No support for methods other than GET\n\n") ; 
+            }
     }
 }
 int main(int argc, char *argv[])
