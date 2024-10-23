@@ -102,7 +102,7 @@ void thread_fn(void * socketNew){
 		int pos=0;
 		char response[MAX_BYTES];
         // If the data is large , the response from the cache is sent n chunks of size MAX_BYTES
-		while(pos<size){
+		while(pos < size){
 			bzero(response,MAX_BYTES);
 			for(int i=0;i<MAX_BYTES;i++){
 				response[i]=temp->data[pos];
@@ -116,6 +116,42 @@ void thread_fn(void * socketNew){
 		// sem_post(&seamaphore);
 		// return NULL;
 	}
+
+    else if(bytes_sent_from_client > 0){
+        /*
+        A new ParsedRequest object is created, which will hold the 
+        parsed components of the HTTP request (such as method, host, path, and version)
+        */
+       len = strlen(buffer); 
+		//Parsing the request
+		ParsedRequest* request = ParsedRequest_create();
+		
+        //ParsedRequest_parse returns 0 on success and -1 on failure.On success it stores parsed request in
+        // the request
+		if (ParsedRequest_parse(request, buffer, len) < 0) 
+		{
+		   	printf("Parsing failed\n");
+		}
+		else
+		{	
+			bzero(buffer, MAX_BYTES);
+			if(!strcmp(request->method,"GET"))							
+			{
+                
+				if( request->host && request->path && (checkHTTPversion(request->version) == 1) )
+				{
+					bytes_sent_from_client = handle_request(socket, request, tempReq);		// Handle GET request
+					if(bytes_sent_from_client == -1)
+					{	
+						sendErrorMessage(socket, 500);
+					}
+
+				}
+				else
+					sendErrorMessage(socket, 500);			// 500 Internal Error
+
+			}
+    }
 }
 int main(int argc, char *argv[])
 {
