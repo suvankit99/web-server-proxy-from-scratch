@@ -84,6 +84,38 @@ void thread_fn(void * socketNew){
 			break;
 		}
 	}
+
+
+	char *tempReq = (char*)malloc(strlen(buffer)*sizeof(char)+1);
+    //tempReq, buffer both store the http request sent by client
+	for (int i = 0; i < strlen(buffer); i++)
+	{
+		tempReq[i] = buffer[i];
+	}
+	
+	//checking for the request in cache 
+	struct cache_element* temp = find(tempReq);
+
+	if( temp != NULL){
+        //request found in cache, so sending the response to client from proxy's cache
+		int size=temp->len/sizeof(char);
+		int pos=0;
+		char response[MAX_BYTES];
+        // If the data is large , the response from the cache is sent n chunks of size MAX_BYTES
+		while(pos<size){
+			bzero(response,MAX_BYTES);
+			for(int i=0;i<MAX_BYTES;i++){
+				response[i]=temp->data[pos];
+				pos++;
+			}
+			send(socket,response,MAX_BYTES,0);
+		}
+		printf("Data retrived from the Cache\n\n");
+		printf("%s\n\n",response);
+		// close(socketNew);
+		// sem_post(&seamaphore);
+		// return NULL;
+	}
 }
 int main(int argc, char *argv[])
 {
