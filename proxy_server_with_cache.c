@@ -18,8 +18,7 @@
 
 #define MAX_CLIENTS 10
 
-#define MAX_BYTES 4096    //max allowed size of request/response
-
+#define MAX_BYTES 4096 // max allowed size of request/response
 
 typedef struct cache_element cache_element;
 
@@ -53,108 +52,130 @@ pthread_mutex_t lock;
 cache_element *head;
 int cache_size;
 
+void thread_fn(void *socketNew)
+{
+    sem_wait(&semaphore);
+    int p;
+    sem_getvalue(&semaphore, &p);
+    printf("semaphore value:%d\n", p);
 
-void thread_fn(void * socketNew){
-    sem_wait(&semaphore); 
-	int p;
-	sem_getvalue(&semaphore,&p);
-	printf("semaphore value:%d\n",p);
+    int *t = (int *)(socketNew);
+    int socket = *t;                 // Socket is socket descriptor of the connected Client
+    int bytes_sent_from_client, len; // Bytes Transferred
 
-    int* t= (int*)(socketNew);
-	int socket=*t;           // Socket is socket descriptor of the connected Client
-	int bytes_sent_from_client,len;	  // Bytes Transferred
+    char *buffer = (char *)calloc(MAX_BYTES, sizeof(char)); // Creating buffer of 4kb for a client
 
-	
-	char *buffer = (char*)calloc(MAX_BYTES,sizeof(char));	// Creating buffer of 4kb for a client
-	
-	
-	bzero(buffer, MAX_BYTES);								// Making buffer zero
-	bytes_sent_from_client = recv(socket, buffer, MAX_BYTES, 0); // Receiving the Request of client by proxy server
-	
-	while(bytes_sent_from_client > 0)
-	{
-		len = strlen(buffer);
-        //loop until u find "\r\n\r\n" in the buffer , it is the EOF ( End of file ) for buffer
-        // Loop until you reach end of buffer 
-		if(strstr(buffer, "\r\n\r\n") == NULL)
-		{	
-			bytes_sent_from_client = recv(socket, buffer + len, MAX_BYTES - len, 0);
-		}
-		else{
-			break;
-		}
-	}
+    bzero(buffer, MAX_BYTES);                                    // Making buffer zero
+    bytes_sent_from_client = recv(socket, buffer, MAX_BYTES, 0); // Receiving the Request of client by proxy server
 
+    while (bytes_sent_from_client > 0)
+    {
+        len = strlen(buffer);
+        // loop until u find "\r\n\r\n" in the buffer , it is the EOF ( End of file ) for buffer
+        //  Loop until you reach end of buffer
+        if (strstr(buffer, "\r\n\r\n") == NULL)
+        {
+            bytes_sent_from_client = recv(socket, buffer + len, MAX_BYTES - len, 0);
+        }
+        else
+        {
+            break;
+        }
+    }
 
-	char *tempReq = (char*)malloc(strlen(buffer)*sizeof(char)+1);
-    //tempReq, buffer both store the http request sent by client
-	for (int i = 0; i < strlen(buffer); i++)
-	{
-		tempReq[i] = buffer[i];
-	}
-	
-	//checking for the request in cache 
-	struct cache_element* temp = find(tempReq);
+    char *tempReq = (char *)malloc(strlen(buffer) * sizeof(char) + 1);
+    // tempReq, buffer both store the http request sent by client
+    for (int i = 0; i < strlen(buffer); i++)
+    {
+        tempReq[i] = buffer[i];
+    }
 
-	if( temp != NULL){
-        //request found in cache, so sending the response to client from proxy's cache
-		int size=temp->len/sizeof(char);
-		int pos=0;
-		char response[MAX_BYTES];
+    // checking for the request in cache
+    struct cache_element *temp = find(tempReq);
+
+    if (temp != NULL)
+    {
+        // request found in cache, so sending the response to client from proxy's cache
+        int size = temp->len / sizeof(char);
+        int pos = 0;
+        char response[MAX_BYTES];
         // If the data is large , the response from the cache is sent n chunks of size MAX_BYTES
-		while(pos < size){
-			bzero(response,MAX_BYTES);
-			for(int i=0;i<MAX_BYTES;i++){
-				response[i]=temp->data[pos];
-				pos++;
-			}
-			send(socket,response,MAX_BYTES,0);
-		}
-		printf("Data retrived from the Cache\n\n");
-		printf("%s\n\n",response);
-		// close(socketNew);
-		// sem_post(&seamaphore);
-		// return NULL;
-	}
+        while (pos < size)
+        {
+            bzero(response, MAX_BYTES);
+            for (int i = 0; i < MAX_BYTES; i++)
+            {
+                response[i] = temp->data[pos];
+                pos++;
+            }
+            send(socket, response, MAX_BYTES, 0);
+        }
+        printf("Data retrived from the Cache\n\n");
+        printf("%s\n\n", response);
+        // close(socketNew);
+        // sem_post(&seamaphore);
+        // return NULL;
+    }
 
-    else if(bytes_sent_from_client > 0){
+    else if (bytes_sent_from_client > 0)
+    {
         /*
-        A new ParsedRequest object is created, which will hold the 
+        A new ParsedRequest object is created, which will hold the
         parsed components of the HTTP request (such as method, host, path, and version)
         */
-       len = strlen(buffer); 
-		//Parsing the request
-		ParsedRequest* request = ParsedRequest_create();
-		
-        //ParsedRequest_parse returns 0 on success and -1 on failure.On success it stores parsed request in
-        // the request
-		if (ParsedRequest_parse(request, buffer, len) < 0) 
-		{
-		   	printf("Parsing failed\n");
-		}
-		else
-		{	
-			bzero(buffer, MAX_BYTES);
-			if(!strcmp(request->method,"GET"))							
-			{
-                
-				if( request->host && request->path && (checkHTTPversion(request->version) == 1) )
-				{
-					bytes_sent_from_client = handle_request(socket, request, tempReq);		// Handle GET request
-					if(bytes_sent_from_client == -1)
-					{	
-						sendErrorMessage(socket, 500);
-					}
+        len = strlen(buffer);
+        // Parsing the request
+        ParsedRequest *request = ParsedRequest_create();
 
-				}
-				else
-					sendErrorMessage(socket, 500);			// 500 Internal Error
+        // ParsedRequest_parse returns 0 on success and -1 on failure.On success it stores parsed request in
+        //  the request
+        if (ParsedRequest_parse(request, buffer, len) < 0)
+        {
+            printf("Parsing failed\n");
+        }
+        else
+        {
+            bzero(buffer, MAX_BYTES);
+            if (!strcmp(request->method, "GET"))
+            {
 
-			}
-            else{
-                printf("No support for methods other than GET\n\n") ; 
+                if (request->host && request->path && (checkHTTPversion(request->version) == 1))
+                {
+                    bytes_sent_from_client = handle_request(socket, request, tempReq); // Handle GET request
+                    if (bytes_sent_from_client == -1)
+                    {
+                        sendErrorMessage(socket, 500);
+                    }
+                }
+                else
+                    sendErrorMessage(socket, 500); // 500 Internal Error
             }
+            else
+            {
+                printf("No support for methods other than GET\n\n");
+            }
+        }
+        // freeing up the request pointer
+        ParsedRequest_destroy(request)
     }
+    else if (bytes_send_client < 0)
+    {
+        perror("Error in receiving from client.\n");
+    }
+    else if (bytes_send_client == 0)
+    {
+        printf("Client disconnected!\n");
+    }
+
+    shutdown(socket, SHUT_RDWR);
+    close(socket);
+    free(buffer);
+    sem_post(&semaphore); // increment semaphore value
+
+    sem_getvalue(&semaphore, &p);
+    printf("Semaphore post value:%d\n", p);
+    free(tempReq);
+    return NULL;
 }
 int main(int argc, char *argv[])
 {
@@ -217,9 +238,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-
-	int i = 0; // Iterator for thread_id (tid) and Accepted Client_Socket for each thread
-	int Connected_socketId[MAX_CLIENTS];   // This array stores socket descriptors of connected clients
+    int i = 0;                           // Iterator for thread_id (tid) and Accepted Client_Socket for each thread
+    int Connected_socketId[MAX_CLIENTS]; // This array stores socket descriptors of connected clients
 
     // Infinite Loop for accepting connections
     while (1)
@@ -242,14 +262,13 @@ int main(int argc, char *argv[])
 
         // Getting IP address and port number of client
         struct sockaddr_in *client_pt = (struct sockaddr_in *)&client_addr; // creating a copy
-        struct in_addr ip_addr = client_pt->sin_addr; // extract ip address
+        struct in_addr ip_addr = client_pt->sin_addr;                       // extract ip address
 
-        char str[INET_ADDRSTRLEN]; // INET_ADDRSTRLEN: Default ip address size
-        inet_ntop(AF_INET, &ip_addr, str, INET_ADDRSTRLEN);// store the ip address in str char array 
-        // we are doing this just to print it 
+        char str[INET_ADDRSTRLEN];                          // INET_ADDRSTRLEN: Default ip address size
+        inet_ntop(AF_INET, &ip_addr, str, INET_ADDRSTRLEN); // store the ip address in str char array
+        // we are doing this just to print it
 
         printf("Client is connected with port number: %d and ip address: %s \n", ntohs(client_addr.sin_port), str);
-
 
         // printf("Socket values of index %d in main function is %d\n",i, client_socketId);
         pthread_create(&tid[i], NULL, thread_fn, (void *)&Connected_socketId[i]); // Creating a thread for each client accepted
